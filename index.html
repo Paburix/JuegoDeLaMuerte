@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0f">
+<title>ONE STEP — Si puedes</title>
+<style>
+  /* ============================================================
+     RESET & BASE
+  ============================================================ */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0a0a0f;
+    --surface:   #12121a;
+    --border:    #1e1e2e;
+    --accent:    #e8ff47;   /* lima venenoso — color de esperanza */
+    --danger:    #ff3f3f;
+    --text:      #f0f0f0;
+    --muted:     #555566;
+    --white:     #ffffff;
+    --font-mono: 'Courier New', monospace;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: var(--font-mono);
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  /* ============================================================
+     PANTALLA PRINCIPAL (stack de pantallas)
+  ============================================================ */
+  .screen {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: var(--bg);
+    z-index: 10;
+    transition: opacity .3s, transform .3s;
+  }
+  .screen.hidden {
+    opacity: 0; pointer-events: none;
+    transform: scale(.97);
+  }
+
+  /* ============================================================
+     PANTALLA TÍTULO
+  ============================================================ */
+  #screen-title {
+    gap: 0;
+    background: var(--bg);
+  }
+  .title-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+    text-align: center;
+    padding: 2rem;
+    max-width: 340px;
+    width: 100%;
+  }
+  .title-eyebrow {
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .title-main {
+    font-size: clamp(56px, 18vw, 88px);
+    font-weight: 900;
+    color: var(--accent);
+    letter-spacing: -2px;
+    line-height: .9;
+    text-shadow: 0 0 60px rgba(232,255,71,.3);
+  }
+  .title-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 16px;
+    letter-spacing: 2px;
+  }
+  .title-divider {
+    width: 40px; height: 1px;
+    background: var(--border);
+    margin: 28px auto;
+  }
+  .title-stats {
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 32px;
+    min-height: 14px;
+  }
+  .title-stats span { color: var(--danger); }
+
+  /* botón principal */
+  .btn-primary {
+    width: 100%; padding: 18px;
+    background: var(--accent);
+    color: var(--bg);
+    border: none; border-radius: 2px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: transform .1s, box-shadow .1s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-primary:active {
+    transform: scale(.97);
+    box-shadow: 0 0 0 3px rgba(232,255,71,.4);
+  }
+  .btn-secondary {
+    width: 100%; padding: 14px;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+
+  /* ============================================================
+     HUD DE JUEGO
+  ============================================================ */
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: 52px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px;
+    background: rgba(10,10,15,.9);
+    border-bottom: 1px solid var(--border);
+    z-index: 5;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+  }
+  .hud-deaths {
+    font-size: 11px;
+    color: var(--danger);
+    letter-spacing: 2px;
+  }
+  .hud-deaths .count {
+    font-size: 22px;
+    font-weight: 900;
+    line-height: 1;
+    display: block;
+  }
+  .hud-level {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-align: right;
+  }
+  .hud-level .lnum {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    display: block;
+  }
+  .hud-progress {
+    position: absolute;
+    bottom: 0; left: 0;
+    height: 2px;
+    background: var(--accent);
+    transition: width .15s linear;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* ============================================================
+     CANVAS
+  ============================================================ */
+  #game-canvas {
+    display: block;
+    position: fixed;
+    top: 52px; left: 0; right: 0;
+    bottom: 80px; /* espacio para controles */
+    background: var(--bg);
+  }
+
+  /* ============================================================
+     CONTROLES TÁCTILES
+  ============================================================ */
+  #controls {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 80px;
+    display: flex;
+    background: rgba(10,10,15,.95);
+    border-top: 1px solid var(--border);
+    z-index: 5;
+  }
+  .ctrl-btn {
+    flex: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background .08s, color .08s;
+    border: none; background: transparent;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+  }
+  .ctrl-btn.active {
+    background: rgba(232,255,71,.06);
+    color: var(--accent);
+  }
+  .ctrl-divider {
+    width: 1px; background: var(--border);
+    flex-shrink: 0;
+  }
+
+  /* ============================================================
+     PANTALLA MUERTE
+  ============================================================ */
+  #screen-death {
+    background: rgba(10,10,15,.97);
+    gap: 8px;
+    z-index: 20;
+  }
+  .death-skull {
+    font-size: 64px;
+    animation: shake .4s ease-out;
+    filter: drop-shadow(0 0 20px var(--danger));
+    margin-bottom: 8px;
+  }
+  .death-title {
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--danger);
+    letter-spacing: -1px;
+  }
+  .death-msg {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-align: center;
+    padding: 0 32px;
+    margin-bottom: 16px;
+    min-height: 18px;
+  }
+  .death-count {
+    font-size: 48px;
+    font-weight: 900;
+    color: var(--white);
+    line-height: 1;
+  }
+  .death-label {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+  }
+  .death-btns {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 80%;
+    max-width: 280px;
+  }
+
+  /* ============================================================
+     PANTALLA WIN
+  ============================================================ */
+  #screen-win {
+    background: var(--bg);
+    gap: 12px;
+    z-index: 20;
+  }
+  .win-icon {
+    font-size: 60px;
+    animation: pop .5s cubic-bezier(.17,.67,.42,1.5);
+    filter: drop-shadow(0 0 30px var(--accent));
+  }
+  .win-title {
+    font-size: 26px;
+    font-weight: 900;
+    color: var(--accent);
+    letter-spacing: -1px;
+  }
+  .win-stats {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-align: center;
+  }
+  .win-stats strong { color: var(--text); }
+  .win-btns {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 80%;
+    max-width: 280px;
+    margin-top: 16px;
+  }
+
+  /* ============================================================
+     MENSAJE FLOTANTE (insultos/sarcasmo)
+  ============================================================ */
+  #float-msg {
+    position: fixed;
+    top: 70px; left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    background: rgba(255,63,63,.1);
+    border: 1px solid rgba(255,63,63,.3);
+    color: var(--danger);
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 8px 16px;
+    border-radius: 2px;
+    z-index: 6;
+    opacity: 0;
+    transition: opacity .2s, transform .2s;
+    pointer-events: none;
+    white-space: nowrap;
+    max-width: 90vw;
+    text-align: center;
+  }
+  #float-msg.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ============================================================
+     KEYFRAMES
+  ============================================================ */
+  @keyframes shake {
+    0%  { transform: rotate(0deg) scale(1); }
+    20% { transform: rotate(-15deg) scale(1.2); }
+    40% { transform: rotate(15deg) scale(1.2); }
+    60% { transform: rotate(-10deg) scale(1.1); }
+    80% { transform: rotate(5deg) scale(1.05); }
+    100%{ transform: rotate(0deg) scale(1); }
+  }
+  @keyframes pop {
+    0%  { transform: scale(0); opacity: 0; }
+    60% { transform: scale(1.2); opacity: 1; }
+    100%{ transform: scale(1); }
+  }
+  @keyframes flash {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     PANTALLA TÍTULO
+============================================================ -->
+<div id="screen-title" class="screen">
+  <div class="title-grid">
+    <div class="title-eyebrow">un juego de</div>
+    <div class="title-main">ONE<br>STEP</div>
+    <div class="title-sub">¿llegas al final?</div>
+    <div class="title-divider"></div>
+    <div class="title-stats" id="title-record"></div>
+    <button class="btn-primary" id="btn-play">▶ JUGAR</button>
+    <button class="btn-secondary" id="btn-howto">¿CÓMO SE JUEGA?</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     PANTALLA HOW TO PLAY
+============================================================ -->
+<div id="screen-howto" class="screen hidden">
+  <div class="title-grid">
+    <div class="title-eyebrow">instrucciones</div>
+    <div style="font-size:32px;color:var(--accent);font-weight:900;margin-bottom:20px;letter-spacing:-1px">HOW TO<br>DIE</div>
+    <div style="font-size:12px;color:var(--muted);line-height:2;text-align:left;padding:16px;border:1px solid var(--border);border-radius:2px;margin-bottom:20px">
+      ← →&nbsp;&nbsp; mover<br>
+      ↑ o doble tap&nbsp;&nbsp; saltar<br>
+      <br>
+      <span style="color:var(--accent)">█</span>&nbsp; plataforma normal<br>
+      <span style="color:#ff8c00">█</span>&nbsp; plataforma que cae<br>
+      <span style="color:#ff3f3f">▲</span>&nbsp; trampa. muerte instantánea<br>
+      <span style="color:#888">░</span>&nbsp; plataforma falsa. atraviesas<br>
+      <br>
+      <span style="color:var(--danger)">Un error = desde el inicio.<br>Sin checkpoints. Sin piedad.</span>
+    </div>
+    <button class="btn-primary" id="btn-howto-ok">ENTENDIDO (mentira)</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     HUD
+============================================================ -->
+<div id="hud" style="display:none">
+  <div class="hud-deaths">
+    <span class="count" id="hud-deaths">0</span>
+    MUERTES
+  </div>
+  <div class="hud-level">
+    <span class="lnum" id="hud-level">1</span>
+    NIVEL
+  </div>
+  <div class="hud-progress" id="hud-progress" style="width:0%"></div>
+</div>
+
+<!-- ============================================================
+     CANVAS
+============================================================ -->
+<canvas id="game-canvas" style="display:none"></canvas>
+
+<!-- ============================================================
+     CONTROLES TÁCTILES
+============================================================ -->
+<div id="controls" style="display:none">
+  <button class="ctrl-btn" id="btn-left" aria-label="Izquierda">◀</button>
+  <div class="ctrl-divider"></div>
+  <button class="ctrl-btn" id="btn-jump" aria-label="Saltar">▲</button>
+  <div class="ctrl-divider"></div>
+  <button class="ctrl-btn" id="btn-right" aria-label="Derecha">▶</button>
+</div>
+
+<!-- ============================================================
+     MENSAJE FLOTANTE
+============================================================ -->
+<div id="float-msg"></div>
+
+<!-- ============================================================
+     PANTALLA MUERTE
+============================================================ -->
+<div id="screen-death" class="screen hidden">
+  <div class="death-skull">💀</div>
+  <div class="death-title">MORISTE</div>
+  <div class="death-msg" id="death-msg"></div>
+  <div class="death-count" id="death-count">0</div>
+  <div class="death-label">veces</div>
+  <div class="death-btns">
+    <button class="btn-primary" id="btn-retry">↺ INTENTAR DE NUEVO</button>
+    <button class="btn-secondary" id="btn-menu">RENDIRSE</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     PANTALLA WIN
+============================================================ -->
+<div id="screen-win" class="screen hidden">
+  <div class="win-icon">🏆</div>
+  <div class="win-title">¿LO LOGRASTE?</div>
+  <div class="win-stats" id="win-stats"></div>
+  <div class="win-btns">
+    <button class="btn-primary" id="btn-next">SIGUIENTE NIVEL →</button>
+    <button class="btn-secondary" id="btn-menu2">MENÚ</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     JAVASCRIPT — MOTOR DEL JUEGO
+============================================================ -->
+<script>
+'use strict';
+
+/* ============================================================
+   CONSTANTES Y CONFIG
+============================================================ */
+const GRAVITY      = 0.55;
+const JUMP_FORCE   = -11;
+const MOVE_SPEED   = 3.2;
+const PLAYER_W     = 16;
+const PLAYER_H     = 20;
+const TILE_SIZE    = 28;
+
+/* Mensajes sarcásticos al morir */
+const DEATH_MSGS = [
+  "Impresionante. Casi.",
+  "¿De verdad creíste que ibas a pasar ahí?",
+  "Ese error lo vio hasta tu abuela.",
+  "Estadísticamente imposible ser tan malo.",
+  "El juego te está mirando con pena.",
+  "Intento #: sigue siendo penoso.",
+  "El creador del juego se ríe.",
+  "Ni el tutorial era tan difícil.",
+  "¿Estás bien? ¿Necesitas ayuda?",
+  "Tal vez los videojuegos no son lo tuyo.",
+  "Récord personal de decepciones.",
+  "Hasta el cursor te tiene lástima.",
+  "Esto es estadísticamente improbable... y aquí estás.",
+  "El tutorial era opcional. Deberías haberlo tomado.",
+  "Otro intento, otra decepción.",
+];
+
+/* ============================================================
+   DISEÑO DE NIVELES
+   Cada nivel: array de strings (mapa)
+   Leyenda:
+     ' ' = vacío
+     'X' = plataforma sólida
+     'F' = plataforma que cae (falling)
+     'G' = plataforma fantasma (falsa, solo visual)
+     'T' = trampa (pico) — muerte instantánea
+     'S' = inicio del jugador
+     'E' = meta
+============================================================ */
+const LEVELS = [
+  // NIVEL 1 — Tutorial: aprende a saltar
+  [
+    "                                        ",
+    "                                        ",
+    "                              E         ",
+    "                             XX         ",
+    "                                        ",
+    "                   XXX                  ",
+    "             XXX                        ",
+    "       XXX                              ",
+    "  SXXXXXXXXX    T                       ",
+    "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+  ],
+
+  // NIVEL 2 — Doble salto obligatorio, huecos alcanzables
+  [
+    "                                              ",
+    "                                        E     ",
+    "                                       XX     ",
+    "                                              ",
+    "                              XXX             ",
+    "                                              ",
+    "                   XXX   T                    ",
+    "          XXX                                 ",
+    "  SXXXXX      T                               ",
+    "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+  ],
+
+  // NIVEL 3 — Plataformas que caen + fantasmas
+  [
+    "                                                    ",
+    "                                            E       ",
+    "                                           XX       ",
+    "                                                    ",
+    "                             FF    T                ",
+    "                   GXX                             ",
+    "          XXX   T       FF                          ",
+    "   XXX                                              ",
+    "  SXXX   T                                          ",
+    "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+  ],
+
+  // NIVEL 4 — Caos total
+  [
+    "                                                         ",
+    "                                               E         ",
+    "                                              XX         ",
+    "                                    G  T                 ",
+    "                          FF      XX                     ",
+    "                 T    GXX                                ",
+    "        FF            T      FF                          ",
+    "  T  XX    T    T        T      XX                       ",
+    " SXXX                                                    ",
+    "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT",
+  ],
+];
+
+/* ============================================================
+   ESTADO GLOBAL
+============================================================ */
+const state = {
+  deaths:       0,
+  totalDeaths:  parseInt(localStorage.getItem('oneStepDeaths') || '0'),
+  currentLevel: parseInt(localStorage.getItem('oneStepLevel')  || '0'),
+  gameRunning:  false,
+  justDied:     false,
+};
+
+/* ============================================================
+   INSTANCIAS DE PANTALLAS Y ELEMENTOS
+============================================================ */
+const screens = {
+  title:  document.getElementById('screen-title'),
+  howto:  document.getElementById('screen-howto'),
+  death:  document.getElementById('screen-death'),
+  win:    document.getElementById('screen-win'),
+};
+const hud      = document.getElementById('hud');
+const canvas   = document.getElementById('game-canvas');
+const ctx      = canvas.getContext('2d');
+const controls = document.getElementById('controls');
+const floatMsg = document.getElementById('float-msg');
+
+/* ============================================================
+   NAVEGACIÓN DE PANTALLAS
+============================================================ */
+function showScreen(name) {
+  Object.values(screens).forEach(s => s.classList.add('hidden'));
+  if (name) screens[name].classList.remove('hidden');
+}
+
+function showGame() {
+  Object.values(screens).forEach(s => s.classList.add('hidden'));
+  hud.style.display     = 'flex';
+  canvas.style.display  = 'block';
+  controls.style.display= 'flex';
+}
+
+function showMenu() {
+  hud.style.display      = 'none';
+  canvas.style.display   = 'none';
+  controls.style.display = 'none';
+  const rec = state.totalDeaths;
+  document.getElementById('title-record').innerHTML =
+    rec > 0 ? `muertes totales: <span>${rec}</span>` : '';
+  showScreen('title');
+}
+
+/* ============================================================
+   MOTOR DEL JUEGO
+============================================================ */
+let player, tiles, camera, fallingTiles, msgTimer, animId;
+
+/* --- Redimensionar canvas --- */
+function resizeCanvas() {
+  const rect = canvas.getBoundingClientRect();
+  canvas.width  = rect.width  || window.innerWidth;
+  canvas.height = rect.height || window.innerHeight - 52 - 80;
+}
+
+/* --- Parsear nivel --- */
+function parseLevel(levelIndex) {
+  const map = LEVELS[levelIndex % LEVELS.length];
+  const result = { tiles: [], startX: 1, startY: 1, endX: 0, endY: 0 };
+
+  for (let row = 0; row < map.length; row++) {
+    for (let col = 0; col < map[row].length; col++) {
+      const ch   = map[row][col];
+      const x    = col * TILE_SIZE;
+      const y    = row * TILE_SIZE;
+      if (ch === 'S') { result.startX = x; result.startY = y - PLAYER_H; }
+      if (ch === 'E') { result.endX   = x; result.endY   = y; }
+      if (ch !== ' ' && ch !== 'S' && ch !== 'E') {
+        result.tiles.push({ x, y, w: TILE_SIZE, h: TILE_SIZE, type: ch, visible: true, alpha: 1, vy: 0, active: true });
+      }
+    }
+  }
+  return result;
+}
+
+/* --- Iniciar nivel --- */
+function startLevel(levelIndex) {
+  resizeCanvas();
+  const data = parseLevel(levelIndex);
+
+  tiles       = data.tiles;
+  fallingTiles = [];
+
+  /* Cámara */
+  camera = { x: 0, y: 0, targetX: 0, targetY: 0 };
+
+  /* Jugador */
+  player = {
+    x:      data.startX,
+    y:      data.startY,
+    vx:     0,
+    vy:     0,
+    onGround: false,
+    alive:  true,
+    jumpCount: 0,
+    /* Animación */
+    frame:  0,
+    squash: 1,
+    stretch:1,
+    coyoteTime:  0,   /* gracia para saltar al borde de plataforma */
+    jumpBuffer:  0,   /* buffer de salto presionado antes de aterrizar */
+    extraJumps:  1,   /* doble salto disponible en el aire */
+  };
+
+  /* Goal tile */
+  goal = { x: data.endX, y: data.endY, w: TILE_SIZE, h: TILE_SIZE };
+
+  /* Actualizar HUD */
+  document.getElementById('hud-deaths').textContent = state.deaths;
+  document.getElementById('hud-level').textContent  = (levelIndex % LEVELS.length) + 1;
+  updateProgress();
+
+  state.gameRunning = true;
+
+  if (animId) cancelAnimationFrame(animId);
+  loop();
+}
+
+let goal = { x: 0, y: 0, w: TILE_SIZE, h: TILE_SIZE };
+
+/* --- Calcular progreso horizontal --- */
+function updateProgress() {
+  const maxX = LEVELS[state.currentLevel % LEVELS.length][0].length * TILE_SIZE;
+  const pct  = Math.min(100, Math.max(0, (player.x / (maxX - canvas.width)) * 100));
+  document.getElementById('hud-progress').style.width = pct + '%';
+}
+
+/* ============================================================
+   INPUT
+============================================================ */
+const keys  = { left: false, right: false, jump: false };
+let   touchJumpFlag = false;
+let   lastTap = 0;
+
+/* Teclado */
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft'  || e.key === 'a') keys.left  = true;
+  if (e.key === 'ArrowRight' || e.key === 'd') keys.right = true;
+  if (e.key === 'ArrowUp' || e.key === 'w' || e.key === ' ') {
+    if (!keys.jump) touchJumpFlag = true;
+    keys.jump = true;
+  }
+});
+document.addEventListener('keyup', e => {
+  if (e.key === 'ArrowLeft'  || e.key === 'a') keys.left  = false;
+  if (e.key === 'ArrowRight' || e.key === 'd') keys.right = false;
+  if (e.key === 'ArrowUp' || e.key === 'w' || e.key === ' ') keys.jump = false;
+});
+
+/* Botones táctiles */
+function setupTouchBtn(id, keyName) {
+  const btn = document.getElementById(id);
+  const press = (e) => { e.preventDefault(); keys[keyName] = true; btn.classList.add('active'); if (keyName === 'jump') touchJumpFlag = true; };
+  const release = (e) => { e.preventDefault(); keys[keyName] = false; btn.classList.remove('active'); };
+  btn.addEventListener('touchstart', press,   { passive: false });
+  btn.addEventListener('touchend',   release, { passive: false });
+  btn.addEventListener('touchcancel',release, { passive: false });
+  btn.addEventListener('mousedown',  press);
+  btn.addEventListener('mouseup',    release);
+  btn.addEventListener('mouseleave', release);
+}
+setupTouchBtn('btn-left',  'left');
+setupTouchBtn('btn-right', 'right');
+setupTouchBtn('btn-jump',  'jump');
+
+/* Swipe en canvas */
+let touchStartX = 0, touchStartY = 0, touchStartT = 0;
+canvas.addEventListener('touchstart', e => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  touchStartT = Date.now();
+}, { passive: true });
+canvas.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  const dt = Date.now() - touchStartT;
+  if (dt < 250 && Math.abs(dx) < 20 && Math.abs(dy) < 20) {
+    /* Tap rápido = salto */
+    touchJumpFlag = true;
+  }
+}, { passive: true });
+
+/* ============================================================
+   LÓGICA DE FÍSICA Y COLISIONES
+============================================================ */
+function updatePlayer(dt) {
+  if (!player.alive) return;
+
+  /* Timers */
+  player.coyoteTime  = Math.max(0, player.coyoteTime  - dt);
+  player.jumpBuffer  = Math.max(0, player.jumpBuffer  - dt);
+
+  /* Movimiento horizontal */
+  player.vx = 0;
+  if (keys.left)  player.vx = -MOVE_SPEED;
+  if (keys.right) player.vx =  MOVE_SPEED;
+
+  /* Salto */
+  if (touchJumpFlag) {
+    player.jumpBuffer = 120; /* ms de buffer */
+    touchJumpFlag = false;
+  }
+  if (player.jumpBuffer > 0) {
+    const canJump = player.onGround || player.coyoteTime > 0;
+    const canDouble = !canJump && player.extraJumps > 0;
+    if (canJump || canDouble) {
+      player.vy         = JUMP_FORCE;
+      player.onGround   = false;
+      player.coyoteTime = 0;
+      player.jumpBuffer = 0;
+      if (canDouble) player.extraJumps--;
+      /* squash al saltar */
+      player.squash  = 0.6;
+      player.stretch = 1.4;
+    }
+  }
+
+  /* Gravedad */
+  player.vy = Math.min(player.vy + GRAVITY, 18);
+
+  /* Mover X */
+  player.x += player.vx;
+  resolveCollisionsX();
+
+  /* Mover Y */
+  const wasOnGround = player.onGround;
+  player.onGround = false;
+  player.y += player.vy;
+  resolveCollisionsY();
+
+  /* Coyote time */
+  if (wasOnGround && !player.onGround && player.vy >= 0) {
+    player.coyoteTime = 100; /* ms */
+  }
+
+  /* Animación squash/stretch */
+  player.squash  += (1 - player.squash)  * 0.25;
+  player.stretch += (1 - player.stretch) * 0.25;
+  player.frame   += player.vx !== 0 ? 0.15 : 0;
+
+  /* Caída al vacío */
+  const mapH = LEVELS[state.currentLevel % LEVELS.length].length * TILE_SIZE;
+  if (player.y > mapH + 100) killPlayer('caíste al vacío');
+}
+
+/* Colisión eje X */
+function resolveCollisionsX() {
+  for (const t of tiles) {
+    if (!t.active || t.type === 'G') continue;
+    if (t.type === 'T') {
+      if (overlaps(player, t)) { killPlayer('trampa'); return; }
+      continue;
+    }
+    if (overlaps(player, t)) {
+      if (player.vx > 0) player.x = t.x - PLAYER_W;
+      if (player.vx < 0) player.x = t.x + t.w;
+    }
+  }
+}
+
+/* Colisión eje Y */
+function resolveCollisionsY() {
+  for (const t of tiles) {
+    if (!t.active) continue;
+    if (t.type === 'T') {
+      if (overlaps(player, t)) { killPlayer('trampa'); return; }
+      continue;
+    }
+    if (t.type === 'G') {
+      /* Plataforma fantasma — solo mata con estética */
+      continue;
+    }
+    if (overlaps(player, t)) {
+      if (player.vy >= 0 && (player.y + PLAYER_H - player.vy) <= t.y + 1) {
+        /* Aterrizando encima */
+        player.y      = t.y - PLAYER_H;
+        player.vy     = 0;
+        player.onGround = true;
+        /* Squash al aterrizar */
+        player.squash      = 1.4;
+        player.stretch     = 0.6;
+        player.extraJumps  = 1; /* restaurar doble salto al tocar suelo */
+        /* Activar caída si es plataforma F */
+        if (t.type === 'F' && !t.falling) {
+          t.falling = true;
+          t.fallTimer = 0;
+        }
+      } else if (player.vy < 0) {
+        player.y  = t.y + t.h;
+        player.vy = 0;
+      }
+    }
+  }
+}
+
+function overlaps(a, b) {
+  return a.x < b.x + b.w &&
+         a.x + PLAYER_W > b.x &&
+         a.y < b.y + b.h &&
+         a.y + PLAYER_H > b.y;
+}
+
+/* Actualizar tiles que caen */
+function updateFallingTiles(dt) {
+  for (const t of tiles) {
+    if (t.type !== 'F') continue;
+    if (!t.falling) continue;
+    t.fallTimer += dt;
+    if (t.fallTimer < 300) {
+      /* Vibrar antes de caer */
+      t.shakeX = (Math.random() - .5) * 3;
+    } else {
+      /* Caer */
+      t.vy   = (t.vy || 0) + 0.6;
+      t.y   += t.vy;
+      t.alpha = Math.max(0, 1 - (t.fallTimer - 300) / 600);
+      if (t.alpha <= 0) t.active = false;
+    }
+  }
+}
+
+/* ============================================================
+   MUERTE Y RESPAWN
+============================================================ */
+let msgFloatTimer = null;
+
+function killPlayer(cause) {
+  if (!player.alive) return;
+  player.alive = false;
+  state.deaths++;
+  state.totalDeaths++;
+  localStorage.setItem('oneStepDeaths', state.totalDeaths);
+
+  const msg = DEATH_MSGS[Math.floor(Math.random() * DEATH_MSGS.length)];
+  showFloatMsg(msg);
+
+  setTimeout(() => {
+    state.gameRunning = false;
+    /* Actualizar pantalla de muerte */
+    document.getElementById('death-count').textContent = state.deaths;
+    document.getElementById('death-msg').textContent   = msg;
+    showScreen('death');
+    hud.style.display = 'none';
+  }, 500);
+}
+
+function showFloatMsg(text) {
+  floatMsg.textContent = text;
+  floatMsg.classList.add('show');
+  clearTimeout(msgFloatTimer);
+  msgFloatTimer = setTimeout(() => floatMsg.classList.remove('show'), 2500);
+}
+
+/* ============================================================
+   META / WIN
+============================================================ */
+function checkWin() {
+  /* Detección generosa: el centro del jugador entra en la zona de la meta */
+  const px = player.x + PLAYER_W / 2;
+  const py = player.y + PLAYER_H / 2;
+  const inGoal = px > goal.x &&
+                 px < goal.x + goal.w &&
+                 py > goal.y - 24 &&
+                 py < goal.y + goal.h;
+  if (inGoal) {
+    state.gameRunning = false;
+    player.alive = false;
+    const levelsDone = state.currentLevel + 1;
+    state.currentLevel = Math.min(levelsDone, LEVELS.length - 1);
+    localStorage.setItem('oneStepLevel', state.currentLevel);
+
+    document.getElementById('win-stats').innerHTML =
+      `nivel completado con <strong>${state.deaths}</strong> muertes<br>` +
+      `récord total: <strong>${state.totalDeaths}</strong> muertes`;
+
+    setTimeout(() => {
+      hud.style.display = 'none';
+      showScreen('win');
+    }, 300);
+  }
+}
+
+/* ============================================================
+   CÁMARA
+============================================================ */
+function updateCamera() {
+  const mapW  = LEVELS[state.currentLevel % LEVELS.length][0].length * TILE_SIZE;
+  const mapH  = LEVELS[state.currentLevel % LEVELS.length].length   * TILE_SIZE;
+  const halfW = canvas.width  / 2;
+  const halfH = canvas.height / 2;
+
+  camera.targetX = player.x + PLAYER_W / 2 - halfW;
+  camera.targetY = player.y + PLAYER_H / 2 - halfH;
+
+  /* Clamp */
+  camera.targetX = Math.max(0, Math.min(camera.targetX, mapW - canvas.width));
+  camera.targetY = Math.max(0, Math.min(camera.targetY, mapH - canvas.height));
+
+  /* Suavizar */
+  camera.x += (camera.targetX - camera.x) * 0.12;
+  camera.y += (camera.targetY - camera.y) * 0.12;
+}
+
+/* ============================================================
+   RENDERIZADO
+============================================================ */
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  /* Fondo con grid tenue */
+  drawBackground();
+
+  ctx.save();
+  ctx.translate(-Math.round(camera.x), -Math.round(camera.y));
+
+  /* Tiles */
+  for (const t of tiles) {
+    if (!t.active) continue;
+    drawTile(t);
+  }
+
+  /* Meta */
+  drawGoal();
+
+  /* Jugador */
+  if (player.alive || state.justDied) drawPlayer();
+
+  ctx.restore();
+}
+
+function drawBackground() {
+  ctx.fillStyle = '#0a0a0f';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  /* Grid puntinado */
+  ctx.fillStyle = 'rgba(255,255,255,0.03)';
+  const gs = 32;
+  for (let x = 0; x < canvas.width; x += gs)
+    for (let y = 0; y < canvas.height; y += gs)
+      ctx.fillRect(x, y, 1, 1);
+}
+
+const TILE_COLORS = {
+  X: '#2a2a3e',
+  F: '#3a2a1a',
+  G: '#1a1a2a',
+  T: '#3a1010',
+  E: '#1a2a1a',
+};
+const TILE_ACCENT = {
+  X: '#3a3a5e',
+  F: '#ff8c00',
+  G: '#2a2a4a',
+  T: '#ff3f3f',
+  E: '#e8ff47',
+};
+
+function drawTile(t) {
+  const sx = t.x + (t.shakeX || 0);
+  const sy = t.y;
+  const alpha = t.alpha !== undefined ? t.alpha : 1;
+
+  ctx.globalAlpha = alpha;
+
+  if (t.type === 'G') {
+    /* Fantasma — solo outline punteado */
+    ctx.strokeStyle = 'rgba(100,100,160,0.4)';
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([3, 4]);
+    ctx.strokeRect(sx + .5, sy + .5, t.w - 1, t.h - 1);
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    return;
+  }
+
+  if (t.type === 'T') {
+    /* Trampa — pico */
+    ctx.fillStyle = '#1a0808';
+    ctx.fillRect(sx, sy, t.w, t.h);
+    ctx.fillStyle = '#ff3f3f';
+    ctx.beginPath();
+    ctx.moveTo(sx + t.w / 2, sy + 3);
+    ctx.lineTo(sx + t.w - 4, sy + t.h - 2);
+    ctx.lineTo(sx + 4,       sy + t.h - 2);
+    ctx.closePath();
+    ctx.fill();
+    /* Destello */
+    ctx.fillStyle = 'rgba(255,100,100,0.2)';
+    ctx.fillRect(sx, sy, t.w, t.h);
+    ctx.globalAlpha = 1;
+    return;
+  }
+
+  /* Plataforma sólida */
+  ctx.fillStyle = TILE_COLORS[t.type] || '#2a2a3e';
+  ctx.fillRect(sx, sy, t.w, t.h);
+
+  /* Borde superior */
+  ctx.fillStyle = TILE_ACCENT[t.type] || '#3a3a5e';
+  ctx.fillRect(sx, sy, t.w, 2);
+
+  /* Borde derecho oscuro */
+  ctx.fillStyle = 'rgba(0,0,0,.4)';
+  ctx.fillRect(sx + t.w - 2, sy + 2, 2, t.h - 2);
+
+  ctx.globalAlpha = 1;
+}
+
+function drawGoal() {
+  const t = Date.now() / 800;
+  const pulse = Math.sin(t) * .3 + .7;
+
+  /* Resplandor */
+  ctx.globalAlpha = 0.2 * pulse;
+  ctx.fillStyle   = '#e8ff47';
+  ctx.fillRect(goal.x - 4, goal.y - 4, goal.w + 8, goal.h + 8);
+  ctx.globalAlpha = 1;
+
+  /* Flag */
+  ctx.fillStyle = '#e8ff47';
+  ctx.fillRect(goal.x + 6, goal.y - 20, 3, 20);   /* poste */
+  ctx.fillRect(goal.x + 9, goal.y - 20, 10, 7);   /* bandera */
+
+  /* Tile base */
+  ctx.fillStyle = '#1a2a1a';
+  ctx.fillRect(goal.x, goal.y, goal.w, goal.h);
+  ctx.fillStyle = '#e8ff47';
+  ctx.fillRect(goal.x, goal.y, goal.w, 2);
+}
+
+function drawPlayer() {
+  if (!player.alive) return;
+
+  const cx = player.x + PLAYER_W / 2;
+  const cy = player.y + PLAYER_H / 2;
+
+  /* Squash/stretch alrededor del centro */
+  const w = PLAYER_W * player.squash;
+  const h = PLAYER_H * player.stretch;
+
+  /* Sombra */
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle   = '#000';
+  ctx.fillRect(cx - w / 2 + 2, cy + h / 2 + 1, w, 3);
+  ctx.globalAlpha = 1;
+
+  /* Cuerpo */
+  ctx.fillStyle = '#e8ff47';
+  ctx.fillRect(Math.round(cx - w / 2), Math.round(cy - h / 2), Math.round(w), Math.round(h));
+
+  /* Ojos */
+  const eyeY = Math.round(cy - h / 4);
+  const eyeOff = player.vx > 0 ? 2 : (player.vx < 0 ? -2 : 0);
+  ctx.fillStyle = '#0a0a0f';
+  ctx.fillRect(Math.round(cx + eyeOff - 4), eyeY - 1, 2, 2);
+  ctx.fillRect(Math.round(cx + eyeOff + 2), eyeY - 1, 2, 2);
+
+  /* Trazo de movimiento cuando corre */
+  if (Math.abs(player.vx) > 0 && player.onGround) {
+    ctx.globalAlpha = 0.15;
+    ctx.fillStyle   = '#e8ff47';
+    ctx.fillRect(Math.round(cx - w / 2) - 4, Math.round(cy - h / 2), Math.round(w * .6), Math.round(h));
+    ctx.globalAlpha = 1;
+  }
+}
+
+/* ============================================================
+   LOOP PRINCIPAL
+============================================================ */
+let lastTime = 0;
+
+function loop(ts = 0) {
+  const dt = Math.min(ts - lastTime, 50); /* cap 50ms para no explotar física */
+  lastTime = ts;
+
+  if (state.gameRunning) {
+    updatePlayer(dt);
+    updateFallingTiles(dt);
+    updateCamera();
+    updateProgress();
+    checkWin();
+  }
+
+  render();
+  animId = requestAnimationFrame(loop);
+}
+
+/* ============================================================
+   BOTONES UI
+============================================================ */
+document.getElementById('btn-play').addEventListener('click', () => {
+  showGame();
+  startLevel(state.currentLevel);
+});
+
+document.getElementById('btn-howto').addEventListener('click', () => {
+  showScreen('howto');
+});
+
+document.getElementById('btn-howto-ok').addEventListener('click', () => {
+  showScreen('title');
+});
+
+document.getElementById('btn-retry').addEventListener('click', () => {
+  showGame();
+  startLevel(state.currentLevel);
+});
+
+document.getElementById('btn-menu').addEventListener('click', () => {
+  state.gameRunning = false;
+  hud.style.display      = 'none';
+  canvas.style.display   = 'none';
+  controls.style.display = 'none';
+  showMenu();
+});
+
+document.getElementById('btn-next').addEventListener('click', () => {
+  state.deaths = 0;
+  showGame();
+  startLevel(state.currentLevel);
+});
+
+document.getElementById('btn-menu2').addEventListener('click', () => {
+  state.gameRunning = false;
+  hud.style.display      = 'none';
+  canvas.style.display   = 'none';
+  controls.style.display = 'none';
+  showMenu();
+});
+
+/* Prevenir scroll en móvil */
+document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+/* Redimensionar */
+window.addEventListener('resize', () => {
+  if (state.gameRunning) resizeCanvas();
+});
+
+
+/* ============================================================
+   MÚSICA — Web Audio API
+   Canción generada proceduralmente: melodía menor perturbadora
+   Se inicia con el primer toque del usuario (política del navegador)
+============================================================ */
+const Music = (() => {
+  let ctx = null, started = false, nodes = [];
+
+  /* Escala menor armónica en La — siniestra por naturaleza */
+  const SCALE = [220, 246.94, 261.63, 293.66, 329.63, 349.23, 415.30, 440];
+
+  /* Melodía: índices en la escala + duración en beats */
+  const MELODY = [
+    [0,1],[2,0.5],[1,0.5],[3,1],[2,1.5],
+    [4,0.5],[3,0.5],[5,1],[4,1],[6,0.5],[7,0.5],
+    [6,1],[4,0.5],[2,0.5],[0,2],
+    [5,0.5],[4,0.5],[3,1],[1,0.5],[0,0.5],[2,1.5],
+    [3,0.5],[5,0.5],[4,1],[6,0.5],[5,0.5],[7,2],
+  ];
+
+  function init() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
+  /* Crea un oscilador con envolvente ADSR suave */
+  function note(freq, startTime, duration, vol = 0.08) {
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filt = ctx.createBiquadFilter();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(freq, startTime);
+
+    /* Vibrato leve — efecto perturbador */
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    lfo.frequency.value = 4.5;
+    lfoGain.gain.value  = 2;
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+    lfo.start(startTime);
+    lfo.stop(startTime + duration + 0.1);
+
+    /* Filtro paso-bajos — sonido oscuro */
+    filt.type            = 'lowpass';
+    filt.frequency.value = 900;
+    filt.Q.value         = 2;
+
+    /* ADSR */
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(vol,  startTime + 0.04);
+    gain.gain.setValueAtTime(vol,            startTime + duration - 0.08);
+    gain.gain.linearRampToValueAtTime(0,     startTime + duration);
+
+    osc.connect(filt);
+    filt.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(startTime);
+    osc.stop(startTime + duration + 0.05);
+    nodes.push(osc, lfo);
+  }
+
+  /* Bajo pulsante — da tensión */
+  function bass(freq, startTime, duration) {
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = freq / 2; /* una octava abajo */
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(0.06, startTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + duration + 0.05);
+    nodes.push(osc);
+  }
+
+  /* Reverb simple con convolver */
+  function makeReverb() {
+    const conv   = ctx.createConvolver();
+    const len    = ctx.sampleRate * 2;
+    const buf    = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = 0; i < len; i++)
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+    }
+    conv.buffer = buf;
+    return conv;
+  }
+
+  let loopTimer = null;
+
+  function scheduleLoop() {
+    if (!ctx || !started) return;
+    const BPM      = 72;
+    const beatLen  = 60 / BPM;
+    let   t        = ctx.currentTime + 0.05;
+    const totalBeats = MELODY.reduce((s, [, d]) => s + d, 0);
+
+    MELODY.forEach(([idx, dur]) => {
+      const freq = SCALE[idx];
+      note(freq, t, dur * beatLen * 0.85);
+      /* Bajo en primer tiempo de cada compás */
+      if (idx === 0 || idx === 4) bass(freq, t, beatLen * 0.4);
+      t += dur * beatLen;
+    });
+
+    /* Relanzar el loop cuando termine */
+    const loopDuration = totalBeats * beatLen * 1000;
+    loopTimer = setTimeout(scheduleLoop, loopDuration - 300);
+  }
+
+  function start() {
+    if (started) return;
+    init();
+    started = true;
+    scheduleLoop();
+  }
+
+  function stop() {
+    started = false;
+    clearTimeout(loopTimer);
+    nodes.forEach(n => { try { n.stop(); } catch(e){} });
+    nodes = [];
+  }
+
+  return { start, stop };
+})();
+
+/* Arrancar música con el primer toque del usuario */
+function initMusicOnFirstTouch() {
+  Music.start();
+  document.removeEventListener('touchstart', initMusicOnFirstTouch);
+  document.removeEventListener('mousedown',  initMusicOnFirstTouch);
+  document.removeEventListener('keydown',    initMusicOnFirstTouch);
+}
+document.addEventListener('touchstart', initMusicOnFirstTouch, { once: true });
+document.addEventListener('mousedown',  initMusicOnFirstTouch, { once: true });
+document.addEventListener('keydown',    initMusicOnFirstTouch, { once: true });
+
+/* ============================================================
+   INICIO
+============================================================ */
+showMenu();
+</script>
+</body>
+</html>
